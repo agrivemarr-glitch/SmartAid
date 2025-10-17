@@ -3,15 +3,14 @@ name: SmartAid Android Build
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # allows manual build trigger
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -19,44 +18,54 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install Android and Buildozer Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk python3-pip
-          pip install --upgrade buildozer cython virtualenv
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            zip \
+            unzip \
+            openjdk-17-jdk \
+            python3-pip \
+            python3-setuptools \
+            python3-wheel \
+            libffi-dev \
+            libssl-dev \
+            liblzma-dev \
+            libsqlite3-dev \
+            zlib1g-dev
+          pip install --upgrade pip Cython virtualenv buildozer
 
-      - name: Cache Buildozer global directory
+      - name: Cache Buildozer Global Directory
         uses: actions/cache@v4
         with:
           path: .buildozer_global
           key: buildozer-global-${{ hashFiles('buildozer.spec') }}
 
-      - name: Cache Buildozer project directory
+      - name: Cache Buildozer Project Directory
         uses: actions/cache@v4
         with:
           path: .buildozer
-          key: ${{ runner.os }}-${{ github.run_id }}-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-${{ runner.os }}-${{ github.run_id }}-${{ hashFiles('buildozer.spec') }}
 
-      - name: Build with Buildozer
-        uses: r0adkll/buildozer-action@v1.3.0
-        with:
-          command: buildozer android debug
+      - name: Build APK with Buildozer
+        run: |
+          buildozer android debug
 
-      - name: Upload APK artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SmartAid-APK
           path: bin/*.apk
 
       - name: Create GitHub Release
-        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ github.run_number }}"
           name: "SmartAid Build #${{ github.run_number }}"
           draft: false
           prerelease: false
-          files: |
-            bin/*.apk
+          files: bin/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
