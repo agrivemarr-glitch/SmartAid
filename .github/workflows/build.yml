@@ -1,33 +1,18 @@
-name: Android Build (Kivy / Buildozer)
+name: SmartAid Android Build
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:  # allows manual build trigger
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Get Date
-        id: get-date
-        run: |
-          echo "date=$(date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
-
-      - name: Cache Buildozer global directory
-        uses: actions/cache@v4
-        with:
-          path: .buildozer_global
-          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
-
-      - name: Cache Buildozer project directory
-        uses: actions/cache@v4
-        with:
-          path: .buildozer
-          key: ${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('buildozer.spec') }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,15 +25,38 @@ jobs:
           sudo apt-get install -y build-essential git zip unzip openjdk-17-jdk python3-pip
           pip install --upgrade buildozer cython virtualenv
 
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v4
+        with:
+          path: .buildozer_global
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+
+      - name: Cache Buildozer project directory
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: ${{ runner.os }}-${{ github.run_id }}-${{ hashFiles('buildozer.spec') }}
+
       - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
+        uses: r0adkll/buildozer-action@v1.3.0
         with:
           command: buildozer android debug
-          buildozer_version: stable
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: SmartAid-APK
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: bin/*.apk
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "SmartAid Build #${{ github.run_number }}"
+          draft: false
+          prerelease: false
+          files: |
+            bin/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
